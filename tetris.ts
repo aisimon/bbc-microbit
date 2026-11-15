@@ -18,6 +18,7 @@ const FALLING = 255   // brightness of the moving piece
 const SETTLED = 60    // brightness of locked blocks
 
 // Each shape is a list of [x, y] cells inside a 2x2 box
+// Coordinates of the dot(s)
 const SHAPES: number[][][] = [
     [[0, 0]],                           // dot
     [[0, 0], [1, 0]],                   // two dots
