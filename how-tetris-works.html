@@ -81,7 +81,7 @@ header.hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 32
 /* LED matrix */
 .led {
   --size: 22px;
-  display: inline-grid; grid-template-columns: repeat(5, var(--size)); gap: calc(var(--size) * .55);
+  display: inline-grid; grid-template-columns: repeat(var(--cols, 5), var(--size)); gap: calc(var(--size) * .55);
   padding: calc(var(--size) * .8); background: var(--pcb); border-radius: 10px;
   border: 1px solid var(--pcb-edge);
 }
@@ -452,7 +452,9 @@ board = [
   }
   function miniFig(shape, caption) {
     const f = document.createElement("figure");
+    // 4x4 grid with the 2x2 box in the middle (cells 1-2)
     const d = document.createElement("div"); d.className = "led sm";
+    d.style.setProperty("--cols", "4");
     fill(d, shapeRows(shape, 1, 1).slice(0, 4).map(r => r.slice(0, 4)));
     const c = document.createElement("figcaption"); c.textContent = caption;
     f.append(d, c); return f;
