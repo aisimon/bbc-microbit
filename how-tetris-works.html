@@ -112,6 +112,18 @@ header.hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 32
 .score-list li span:first-child { font-family: var(--font-mono); font-weight: 600; }
 .pos { color: var(--accent); }
 .think-figs { display: flex; flex-wrap: wrap; gap: 20px 24px; }
+
+/* appendix: 2x2 address grid */
+.coord-wrap { overflow-x: auto; }
+.coord-box {
+  display: inline-grid; grid-template-columns: auto 5.5em 5.5em; gap: 6px; align-items: center;
+}
+.coord-box code {
+  display: grid; place-items: center; height: 3.2em; background: var(--pcb); color: var(--led-on);
+  border-radius: 6px; font-size: .9rem;
+}
+.coord-box .ax { font-family: var(--font-mono); font-size: .78rem; color: var(--muted); text-align: center; padding: 0 6px; }
+.idea pre { font-size: .82rem; }
 figure { margin: 0; display: grid; gap: 8px; justify-items: center; }
 figcaption { font-size: .82rem; color: var(--muted); text-align: center; max-width: 22ch; }
 
@@ -233,7 +245,7 @@ board = [
   <section>
     <span class="eyebrow">2 · The pieces</span>
     <h2>Three shapes, each inside a 2×2 box</h2>
-    <p>Every shape is a list of <code>[x, y]</code> cells measured from the top-left corner of a 2×2 box. Keeping every piece inside 2×2 means one simple formula can rotate all of them.</p>
+    <p>Every shape is a list of <code>[x, y]</code> cells measured from the top-left corner of a 2×2 box. Keeping every piece inside 2×2 means one simple formula can rotate all of them. New to coordinates? See <a href="#appendix-box">Appendix A</a>.</p>
 <pre>const SHAPES = [
   [[0, 0]],                    <span class="c">// dot</span>
   [[0, 0], [1, 0]],            <span class="c">// two dots</span>
@@ -248,7 +260,7 @@ board = [
     <h2>Turning a piece with one formula</h2>
     <div class="split">
       <div class="stack">
-        <p>To turn a shape clockwise, <code>rotated()</code> moves every cell from <code>(x, y)</code> to <code>(1 − y, x)</code>. Four turns bring it back to where it started, so one anticlockwise turn is three clockwise turns. That is why tilt left calls <code>tryRotate(3)</code>.</p>
+        <p>To turn a shape clockwise, <code>rotated()</code> moves every cell from <code>(x, y)</code> to <code>(1 − y, x)</code>. Four turns bring it back to where it started, so one anticlockwise turn is three clockwise turns. That is why tilt left calls <code>tryRotate(3)</code>. <a href="#appendix-matrix">Appendix B</a> shows the same rotation as a matrix.</p>
 <pre>function rotated(shape) {
   let result = []
   for (let i = 0; i &lt; shape.length; i++) {
@@ -421,6 +433,56 @@ board = [
         <div class="log" id="log">Ready.</div>
       </div>
     </div>
+  </section>
+
+  <section id="appendix-box">
+    <span class="eyebrow">Appendix A</span>
+    <h2>Reading the 2×2 box</h2>
+    <p>Every piece sits in a small box of 4 squares. Each square has an address <code>[x, y]</code>: <strong>x</strong> is the column (0 = left, 1 = right) and <strong>y</strong> is the row (0 = top, 1 = bottom).</p>
+    <div class="coord-wrap">
+      <div class="coord-box" aria-label="2 by 2 box addresses">
+        <span class="ax"></span><span class="ax">x = 0</span><span class="ax">x = 1</span>
+        <span class="ax">y = 0</span><code>[0, 0]</code><code>[1, 0]</code>
+        <span class="ax">y = 1</span><code>[0, 1]</code><code>[1, 1]</code>
+      </div>
+    </div>
+    <p>A shape is just the list of squares that are lit:</p>
+    <div class="row-figs">
+      <figure><div class="led sm" style="--cols:2" data-led="20 00"></div><figcaption><code>[[0,0]]</code><br>dot</figcaption></figure>
+      <figure><div class="led sm" style="--cols:2" data-led="22 00"></div><figcaption><code>[[0,0],[1,0]]</code><br>two dots</figcaption></figure>
+      <figure><div class="led sm" style="--cols:2" data-led="20 22"></div><figcaption><code>[[0,0],[0,1],[1,1]]</code><br>L</figcaption></figure>
+    </div>
+    <p>The type <code>number[][][]</code> means three levels of lists: one square <code>[1, 0]</code>, one shape <code>[[0,0],[1,0]]</code>, and all shapes <code>SHAPES = [ … ]</code>.</p>
+    <p>On screen, the game adds the box position to each square. With the box at <code>px = 2, py = 0</code>, square <code>[1, 0]</code> lands on column 2 + 1 = 3, row 0 + 0 = 0. Moving right changes only <code>px</code>; the shape list stays the same.</p>
+  </section>
+
+  <section id="appendix-matrix">
+    <span class="eyebrow">Appendix B</span>
+    <h2>Rotation as a matrix</h2>
+    <p>The rotation formula <code>(x, y) → (1 − y, x)</code> is a matrix multiplication followed by a shift.</p>
+    <div class="ideas">
+      <div class="idea">
+        <span class="tag">Step 1 · rotate</span>
+        <p>A quarter turn (90°) uses this matrix, because cos 90° = 0 and sin 90° = 1:</p>
+<pre>┌ 0  −1 ┐ ┌ x ┐   ┌ −y ┐
+└ 1   0 ┘ └ y ┘ = └  x ┘</pre>
+        <p>In maths y points up, so this turns anticlockwise. On the micro:bit screen y points down, so the same matrix turns clockwise.</p>
+      </div>
+      <div class="idea">
+        <span class="tag">Step 2 · shift</span>
+        <p>The matrix turns around the top-left corner, so some squares end up at x = −1, outside the box. Adding 1 to x moves them back:</p>
+<pre>(−y, x) + (1, 0) = (1 − y, x)</pre>
+        <p>The same answer comes from turning around the box's centre (0.5, 0.5): subtract 0.5, rotate, add 0.5.</p>
+      </div>
+      <div class="idea">
+        <span class="tag">Why 4 turns = start</span>
+        <p>Multiplying the matrix by itself 4 times gives the identity matrix, which changes nothing:</p>
+<pre>R⁴ = ┌ 1  0 ┐
+     └ 0  1 ┘</pre>
+        <p>So anticlockwise is R³, three clockwise turns. That's why tilt left calls <code>tryRotate(3)</code>.</p>
+      </div>
+    </div>
+    <p class="hint">The code writes the result out directly as <code>[1 - c[1], c[0]]</code> instead of multiplying matrices. It gives the same answer and is quicker on the micro:bit.</p>
   </section>
 
   <footer>Source: <code>tetris.ts</code> for the BBC micro:bit V1/V2, written in MakeCode JavaScript. Paste it into the JavaScript tab at makecode.microbit.org.</footer>
