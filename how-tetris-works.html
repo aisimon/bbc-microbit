@@ -1,0 +1,617 @@
+<title>Micro:bit Mini Tetris</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: one reading column; each section pairs prose with a 5x5 LED panel drawn like the micro:bit face */
+:root {
+  --bg: #f3f4f1;
+  --surface: #ffffff;
+  --fg: #1d2420;
+  --muted: #5d6862;
+  --line: #d9ddd8;
+  --pcb: #1e2a24;          /* the board behind the LEDs */
+  --pcb-edge: #33443b;
+  --led-off: #2c3a33;
+  --led-dim: #7a2a22;
+  --led-on: #ff3b26;
+  --led-glow: rgba(255, 59, 38, .55);
+  --accent: #c2321f;
+  --code-bg: #eceee9;
+  --font-display: "Sora", "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #121714; --surface: #1a211d; --fg: #e4e9e5; --muted: #9aa69f; --line: #2c3631;
+    --pcb: #0c110e; --pcb-edge: #26332c; --led-off: #1c2620; --led-dim: #6a241d; --led-on: #ff4a33;
+    --led-glow: rgba(255, 74, 51, .6); --accent: #ff6a52; --code-bg: #1f2722; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #121714; --surface: #1a211d; --fg: #e4e9e5; --muted: #9aa69f; --line: #2c3631;
+  --pcb: #0c110e; --pcb-edge: #26332c; --led-off: #1c2620; --led-dim: #6a241d; --led-on: #ff4a33;
+  --led-glow: rgba(255, 74, 51, .6); --accent: #ff6a52; --code-bg: #1f2722; color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.6;
+}
+.wrap {
+  max-width: 920px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 72px;
+  display: grid; gap: 56px;
+}
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.2; margin: 0; }
+h1 { font-size: clamp(2rem, 5vw, 2.9rem); font-weight: 700; letter-spacing: -.02em; }
+h2 { font-size: 1.5rem; font-weight: 700; }
+h3 { font-size: 1.05rem; font-weight: 500; }
+p { margin: 0; max-width: 65ch; }
+.eyebrow {
+  font-family: var(--font-mono); font-size: .75rem; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--accent);
+}
+code, .mono { font-family: var(--font-mono); font-size: .88em; }
+:not(pre) > code { background: var(--code-bg); padding: .1em .35em; border-radius: 4px; }
+pre {
+  margin: 0; background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px;
+  padding: 14px 16px; overflow-x: auto; font-size: .85rem; line-height: 1.55;
+}
+pre .c { color: var(--muted); }
+a { color: var(--accent); }
+
+section { display: grid; gap: 18px; }
+.stack { display: grid; gap: 12px; min-width: 0; }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 28px; align-items: start; }
+@media (max-width: 680px) { .split { grid-template-columns: 1fr; } }
+
+/* hero */
+header.hero { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 32px; align-items: center; }
+@media (max-width: 680px) { header.hero { grid-template-columns: 1fr; } }
+.lede { font-size: 1.1rem; color: var(--muted); }
+
+/* LED matrix */
+.led {
+  --size: 22px;
+  display: inline-grid; grid-template-columns: repeat(5, var(--size)); gap: calc(var(--size) * .55);
+  padding: calc(var(--size) * .8); background: var(--pcb); border-radius: 10px;
+  border: 1px solid var(--pcb-edge);
+}
+.led.sm { --size: 12px; border-radius: 7px; }
+.led.lg { --size: 30px; }
+.led i {
+  width: var(--size); height: var(--size); border-radius: 3px; background: var(--led-off); display: block;
+}
+.led i.d { background: var(--led-dim); }
+.led i.b { background: var(--led-on); box-shadow: 0 0 calc(var(--size) * .6) var(--led-glow); }
+.led i.x { background: var(--led-on); outline: 2px dashed var(--fg); outline-offset: 2px; }
+.led i.n { background: transparent; outline: 1.5px dashed var(--muted); outline-offset: -1.5px; }
+.led i.o { background: var(--led-dim); outline: 2px dashed var(--fg); outline-offset: 2px; }
+.led i.g { background: transparent; outline: 2px dashed var(--led-on); outline-offset: -2px; }
+
+/* thinking section */
+.ideas { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.idea {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  padding: 16px 18px; display: grid; gap: 8px; align-content: start; min-width: 0;
+}
+.idea .tag { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.idea p { font-size: .93rem; }
+.idea .player { border-top: 1px dashed var(--line); padding-top: 8px; }
+.idea .player b { color: var(--accent); font-weight: 600; }
+.score-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.score-list li { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); gap: 10px; font-size: .93rem; }
+.score-list li span:first-child { font-family: var(--font-mono); font-weight: 600; }
+.pos { color: var(--accent); }
+.think-figs { display: flex; flex-wrap: wrap; gap: 20px 24px; }
+figure { margin: 0; display: grid; gap: 8px; justify-items: center; }
+figcaption { font-size: .82rem; color: var(--muted); text-align: center; max-width: 22ch; }
+
+.row-figs { display: flex; flex-wrap: wrap; gap: 20px 24px; align-items: flex-start; }
+.arrow { align-self: center; color: var(--muted); font-family: var(--font-mono); }
+
+/* controls table */
+table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+.table-scroll { overflow-x: auto; }
+th, td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-family: var(--font-mono); font-size: .72rem; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+td:first-child { white-space: nowrap; font-weight: 600; }
+.key {
+  display: inline-block; min-width: 1.9em; text-align: center; padding: 1px 7px;
+  border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 5px;
+  background: var(--surface); font-family: var(--font-mono); font-size: .82rem;
+}
+
+/* loop diagram */
+.flow { display: grid; gap: 10px; counter-reset: s; }
+.flow li {
+  list-style: none; display: grid; grid-template-columns: 2.2em minmax(0, 1fr); gap: 12px; align-items: start;
+}
+.flow li::before {
+  counter-increment: s; content: counter(s);
+  font-family: var(--font-mono); font-weight: 600; color: var(--accent);
+  border: 1.5px solid var(--accent); border-radius: 50%; width: 2em; height: 2em;
+  display: grid; place-items: center; font-size: .85rem;
+}
+.flow { padding: 0; margin: 0; }
+.branch { color: var(--muted); font-size: .92rem; }
+
+/* sim */
+.sim {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+  padding: 20px; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 28px; align-items: start;
+}
+@media (max-width: 680px) { .sim { grid-template-columns: 1fr; justify-items: center; } }
+.pad { display: grid; gap: 10px; }
+.pad .btns { display: flex; flex-wrap: wrap; gap: 8px; }
+button {
+  font: 600 .9rem var(--font-body); color: var(--fg); background: var(--bg);
+  border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 8px; padding: 8px 14px; cursor: pointer;
+}
+button:hover { border-color: var(--accent); }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+button.primary { background: var(--accent); color: var(--surface); border-color: var(--accent); }
+.vars { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+.var { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+.var span { display: block; font-family: var(--font-mono); font-size: .72rem; color: var(--muted); }
+.var b { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: 1.05rem; }
+.log { font-family: var(--font-mono); font-size: .8rem; color: var(--muted); min-height: 1.4em; }
+.hint { font-size: .85rem; color: var(--muted); }
+
+.speed { display: grid; gap: 6px; }
+.speed div { display: grid; grid-template-columns: 6.5em minmax(0, 1fr) 4.5em; gap: 10px; align-items: center; font-size: .88rem; font-variant-numeric: tabular-nums; }
+.speed .bar { height: 10px; background: var(--accent); border-radius: 3px; opacity: .85; }
+.speed .ms { font-family: var(--font-mono); text-align: right; }
+footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--line); padding-top: 18px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+</style>
+
+<div class="wrap">
+
+  <header class="hero">
+    <div class="stack">
+      <span class="eyebrow">BBC micro:bit · MakeCode JavaScript · tetris.ts</span>
+      <h1>How Mini Tetris works on a 5×5 screen</h1>
+      <p class="lede">The whole game lives on 25 LEDs. This page walks through the program piece by piece: how the board is stored, how blocks move and turn, how full rows disappear, and what the main loop does every tick.</p>
+    </div>
+    <figure>
+      <div class="led lg" data-led="00220 00020 00000 10000 11011"></div>
+      <figcaption>Bright = the falling piece. Dim = blocks already landed.</figcaption>
+    </figure>
+  </header>
+
+  <section>
+    <span class="eyebrow">Controls</span>
+    <h2>What each input does</h2>
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Input</th><th>Action</th><th>Code</th></tr></thead>
+        <tbody>
+          <tr><td><span class="key">A</span></td><td>Move left one column</td><td><code>onButtonPressed(Button.A)</code></td></tr>
+          <tr><td><span class="key">B</span></td><td>Move right one column</td><td><code>onButtonPressed(Button.B)</code></td></tr>
+          <tr><td><span class="key">A</span>+<span class="key">B</span></td><td>Rotate clockwise. After game over, start a new game.</td><td><code>onButtonPressed(Button.AB)</code></td></tr>
+          <tr><td>Tilt right</td><td>Rotate clockwise</td><td><code>onGesture(Gesture.TiltRight)</code></td></tr>
+          <tr><td>Tilt left</td><td>Rotate anticlockwise</td><td><code>onGesture(Gesture.TiltLeft)</code></td></tr>
+          <tr><td>Shake</td><td>Drop the piece straight to the bottom</td><td><code>onGesture(Gesture.Shake)</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">1 · The board</span>
+    <h2>The screen is a 5×5 grid of numbers</h2>
+    <div class="split">
+      <div class="stack">
+        <p>The landed blocks are kept in <code>board</code>, a list of 5 rows. Each row is a list of 5 numbers: <code>0</code> means empty and <code>1</code> means a block is there. Row 0 is the top of the screen and row 4 is the bottom.</p>
+        <p>The falling piece is <em>not</em> stored in the board. It is kept separately as a shape plus a position, <code>px</code> (column) and <code>py</code> (row). It only gets written into the board when it lands.</p>
+<pre><span class="c">// board for the picture on the right</span>
+board = [
+  [0, 0, 0, 0, 0],   <span class="c">// row 0 (top)</span>
+  [0, 0, 0, 0, 0],
+  [0, 0, 0, 0, 0],
+  [1, 0, 0, 0, 0],
+  [1, 1, 0, 1, 1]    <span class="c">// row 4 (bottom)</span>
+]</pre>
+      </div>
+      <figure>
+        <div class="led" data-led="00000 00000 00000 10000 11011"></div>
+        <figcaption>x goes left → right (0–4), y goes top → bottom (0–4).</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">2 · The pieces</span>
+    <h2>Three shapes, each inside a 2×2 box</h2>
+    <p>Every shape is a list of <code>[x, y]</code> cells measured from the top-left corner of a 2×2 box. Keeping every piece inside 2×2 means one simple formula can rotate all of them.</p>
+<pre>const SHAPES = [
+  [[0, 0]],                    <span class="c">// dot</span>
+  [[0, 0], [1, 0]],            <span class="c">// two dots</span>
+  [[0, 0], [0, 1], [1, 1]]     <span class="c">// L (3 dots)</span>
+]</pre>
+    <div class="row-figs" id="shapeFigs"></div>
+    <p>When a new piece appears, <code>spawn()</code> picks one of the three shapes at random, turns it 0–3 times, and places it in a random column (0–3) on the top row. If it already overlaps a block, the game is over.</p>
+  </section>
+
+  <section>
+    <span class="eyebrow">3 · Rotation</span>
+    <h2>Turning a piece with one formula</h2>
+    <div class="split">
+      <div class="stack">
+        <p>To turn a shape clockwise, <code>rotated()</code> moves every cell from <code>(x, y)</code> to <code>(1 − y, x)</code>. Four turns bring it back to where it started, so one anticlockwise turn is three clockwise turns. That is why tilt left calls <code>tryRotate(3)</code>.</p>
+<pre>function rotated(shape) {
+  let result = []
+  for (let i = 0; i &lt; shape.length; i++) {
+    const c = shape[i]
+    result.push([1 - c[1], c[0]])
+  }
+  return result
+}</pre>
+        <p><strong>Wall kick.</strong> If the turned shape would hit a wall or a block, <code>tryRotate()</code> tries again one column left, then one column right (the <code>KICKS</code> list <code>[0, -1, 1]</code>). If none of those fit, the piece stays as it was.</p>
+      </div>
+    </div>
+    <div class="row-figs" id="rotFigs"></div>
+  </section>
+
+  <section>
+    <span class="eyebrow">4 · Collision</span>
+    <h2>One function decides if a move is allowed</h2>
+    <div class="split">
+      <div class="stack">
+        <p>Every move goes through <code>fits(shape, x, y)</code>. It checks each cell of the shape at the new position and says no if any cell is off the left, right or bottom edge, or lands on a block already in the board.</p>
+<pre>function fits(shape, x, y) {
+  for (let c of shape) {
+    const cx = x + c[0]
+    const cy = y + c[1]
+    if (cx &lt; 0 || cx &gt;= W || cy &gt;= H) return false
+    if (cy &gt;= 0 &amp;&amp; board[cy][cx]) return false
+  }
+  return true
+}</pre>
+        <p>Button A asks <code>fits(piece, px - 1, py)</code>. If the answer is yes, <code>px</code> goes down by 1 and the screen is redrawn. If no, nothing happens. B, rotate, shake and falling all work the same way.</p>
+      </div>
+      <figure>
+        <div class="led" data-led="00000 00000 0n200 1o200 11011"></div>
+        <figcaption>Pressing A here fails: the dashed cells are where the piece would go, and one of them is already a block.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">5 · The main loop</span>
+    <h2>What happens every tick</h2>
+    <p><code>basic.forever</code> runs over and over. Each time round, it waits <code>speed</code> milliseconds, then calls <code>step()</code>:</p>
+    <ol class="flow">
+      <li><div><strong>Can the piece move down one row?</strong> Check <code>fits(piece, px, py + 1)</code>.</div></li>
+      <li><div><strong>Yes:</strong> add 1 to <code>py</code>. <span class="branch">The piece falls one row.</span></div></li>
+      <li><div><strong>No:</strong> the piece has landed. <code>lockPiece()</code> copies its cells into <code>board</code> as 1s, <code>clearRows()</code> removes any full rows, then <code>spawn()</code> starts a new piece at the top.</div></li>
+      <li><div><strong>Redraw</strong> with <code>draw()</code>: every board cell at dim brightness (60), then the falling piece on top at full brightness (255).</div></li>
+    </ol>
+    <p class="hint">Buttons and gestures run as separate event handlers. They change <code>px</code>, <code>py</code> or <code>piece</code> and redraw straight away, so the piece reacts instantly instead of waiting for the next tick.</p>
+  </section>
+
+  <section>
+    <span class="eyebrow">6 · Clearing rows</span>
+    <h2>Full rows flash, vanish, and everything drops</h2>
+    <div class="stack">
+      <p><code>clearRows()</code> looks at each row with <code>isFull(y)</code>. Full rows flash three times, then each one is removed from the list with <code>board.removeAt(y)</code> and a fresh empty row is added at the top with <code>board.insertAt(0, emptyRow())</code>. Because the list still has 5 rows, every row above the cleared one automatically ends up one place lower.</p>
+      <p>While the flash plays, <code>busy</code> is set to <code>true</code> so button presses are ignored until the board is tidy again.</p>
+    </div>
+    <div class="row-figs">
+      <figure><div class="led" data-led="00000 00000 01000 10020 11122"></div><figcaption>The L piece is about to land.</figcaption></figure>
+      <span class="arrow">→</span>
+      <figure><div class="led" data-led="00000 00000 01000 10010 xxxxx"></div><figcaption>Row 4 is full and flashes.</figcaption></figure>
+      <span class="arrow">→</span>
+      <figure><div class="led" data-led="00000 00000 00000 01000 10010"></div><figcaption>Row removed, new empty row on top, the rest shifts down.</figcaption></figure>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">7 · Score and speed</span>
+    <h2>Each cleared row speeds the game up</h2>
+    <div class="split">
+      <div class="stack">
+        <p>Every cleared row adds 1 to <code>score</code>. The wait between ticks is then worked out again:</p>
+<pre>speed = Math.max(250, 800 - score * 50)</pre>
+        <p>The game starts at 800 ms per row and gets 50 ms faster per point, until it stops at 250 ms from a score of 11.</p>
+      </div>
+      <div class="speed" id="speedChart" aria-label="Wait per tick by score"></div>
+    </div>
+  </section>
+
+  <section>
+    <span class="eyebrow">8 · Game over</span>
+    <h2>Sad face, score, then A+B to play again</h2>
+    <p>When <code>spawn()</code> can't fit a new piece on the top row, it sets <code>gameOver</code> to true. The main loop shows a sad face, then scrolls the score again and again. Pressing A+B sets <code>restartRequested</code>, and once the score finishes scrolling, <code>resetGame()</code> empties the board and puts score and speed back to their starting values.</p>
+  </section>
+
+  <section>
+    <span class="eyebrow">9 · Think like the program</span>
+    <h2>What a person can learn from the code</h2>
+    <p>To write the game, the program had to spell out every rule exactly. Those same steps are a good way for a person to think about any problem, and about how to play Tetris well. Each idea below starts with what the code does and ends with how you can use it.</p>
+    <div class="ideas">
+      <div class="idea">
+        <span class="tag">Break it into small parts</span>
+        <h3>One job per function</h3>
+        <p>The game is not one big program. It is <code>spawn</code>, <code>fits</code>, <code>rotated</code>, <code>lockPiece</code>, <code>clearRows</code> and <code>draw</code>, each doing one thing.</p>
+        <p class="player"><b>You:</b> when a problem feels too big, list the small jobs inside it. "Where can this piece go?" is easier than "How do I win?"</p>
+      </div>
+      <div class="idea">
+        <span class="tag">Describe the situation</span>
+        <h3>Write the state down</h3>
+        <p>Everything the game needs to know is a few numbers: the board grid, the piece shape, <code>px</code>, <code>py</code>, <code>score</code>, <code>speed</code>.</p>
+        <p class="player"><b>You:</b> before you move, look at the whole board. Which columns are tall, which are low, and where are the gaps?</p>
+      </div>
+      <div class="idea">
+        <span class="tag">Check before you act</span>
+        <h3>Ask "does it fit?" first</h3>
+        <p>No move happens until <code>fits()</code> says yes. One checker covers walls, blocks and the floor, so the rules are never broken.</p>
+        <p class="player"><b>You:</b> picture where the piece will land before pressing anything. If it leaves a hole, try another spot.</p>
+      </div>
+      <div class="idea">
+        <span class="tag">Use patterns</span>
+        <h3>One rule, many cases</h3>
+        <p>A single formula, <code>(x, y) → (1 − y, x)</code>, turns every shape. Anticlockwise is just three clockwise turns.</p>
+        <p class="player"><b>You:</b> learn each shape's 4 positions once. Then you recognise them instantly instead of working them out every time.</p>
+      </div>
+      <div class="idea">
+        <span class="tag">Plan for the edges</span>
+        <h3>Think about the awkward cases</h3>
+        <p>What if a piece turns next to a wall? The wall kick tries one step left, then one step right. What if a new piece can't appear? Game over.</p>
+        <p class="player"><b>You:</b> keep the edge columns in mind. Pieces get stuck there, so don't let the sides build up too high.</p>
+      </div>
+      <div class="idea">
+        <span class="tag">Repeat a simple loop</span>
+        <h3>Look, decide, act, repeat</h3>
+        <p>The main loop never changes: wait, try to fall, land, clear, spawn, draw. Every tick follows the same steps.</p>
+        <p class="player"><b>You:</b> give every piece the same quick routine: look at the board, pick a spot, move there, drop. Speed comes from doing it the same way each time.</p>
+      </div>
+    </div>
+
+    <h3>Turning "playing well" into a rule</h3>
+    <p>A computer can't play on feeling. To choose a move, it has to try every column and every rotation, drop the piece in its head, and give each result a score. You can use the same checklist:</p>
+    <ul class="score-list">
+      <li><span class="pos">+ lines</span><span>Clearing a row is the goal, so a move that completes one scores highest.</span></li>
+      <li><span>− holes</span><span>An empty cell with a block above it is hard to fill later. Avoid creating them.</span></li>
+      <li><span>− height</span><span>A tall stack means less time to think. Keep the pile low.</span></li>
+      <li><span>− bumpiness</span><span>Big steps between neighbouring columns make awkward gaps. A flat top fits more shapes.</span></li>
+    </ul>
+    <div class="think-figs">
+      <figure><div class="led" data-led="00000 00000 00000 10g00 11gg1"></div><figcaption>Good: the L fills both gaps, completes the bottom row and keeps the pile low.</figcaption></figure>
+      <figure><div class="led" data-led="00000 00000 000gg 100g0 11001"></div><figcaption>Bad: same L, but it leaves two empty holes underneath and builds a tall step.</figcaption></figure>
+    </div>
+    <p>In the simulator below, press <strong>Show best move</strong> to see this checklist in action. It tries every place the piece could go, scores each one, and draws the winner as a dashed outline, so you can compare its choice with yours.</p>
+  </section>
+
+  <section>
+    <span class="eyebrow">Try it</span>
+    <h2>Play the same logic here</h2>
+    <p>This little simulator uses the same rules as <code>tetris.ts</code>, so you can watch the variables change as you play. On a keyboard: <span class="key">←</span> A, <span class="key">→</span> B, <span class="key">↑</span> rotate, <span class="key">Space</span> shake, <span class="key">H</span> best move.</p>
+    <div class="sim">
+      <div class="led lg" id="simLed" aria-label="Simulated micro:bit screen"></div>
+      <div class="pad">
+        <div class="btns">
+          <button id="bA" type="button">A · left</button>
+          <button id="bB" type="button">B · right</button>
+          <button id="bAB" type="button">A+B · rotate</button>
+        </div>
+        <div class="btns">
+          <button id="bTL" type="button">Tilt left</button>
+          <button id="bTR" type="button">Tilt right</button>
+          <button id="bShake" type="button">Shake</button>
+          <button id="bPause" type="button">Pause</button>
+          <button id="bHint" type="button" class="primary">Show best move</button>
+        </div>
+        <div class="vars">
+          <div class="var"><span>px</span><b id="vPx">0</b></div>
+          <div class="var"><span>py</span><b id="vPy">0</b></div>
+          <div class="var"><span>score</span><b id="vScore">0</b></div>
+          <div class="var"><span>speed</span><b id="vSpeed">800</b></div>
+        </div>
+        <div class="log" id="log">Ready.</div>
+      </div>
+    </div>
+  </section>
+
+  <footer>Source: <code>tetris.ts</code> for the BBC micro:bit V1/V2, written in MakeCode JavaScript. Paste it into the JavaScript tab at makecode.microbit.org.</footer>
+</div>
+
+<script>
+(function () {
+  const CLASS = { "0": "", "1": "d", "2": "b", "x": "x", "n": "n", "o": "o", "g": "g" };
+  function fill(el, rows) {
+    el.innerHTML = "";
+    rows.forEach(r => [...r].forEach(ch => {
+      const i = document.createElement("i");
+      if (CLASS[ch]) i.className = CLASS[ch];
+      el.appendChild(i);
+    }));
+  }
+  document.querySelectorAll("[data-led]").forEach(el => fill(el, el.dataset.led.split(" ")));
+
+  // ----- shared game logic (mirrors tetris.ts) -----
+  const W = 5, H = 5;
+  const SHAPES = [ [[0,0]], [[0,0],[1,0]], [[0,0],[0,1],[1,1]] ];
+  const NAMES = ["Dot", "Two dots", "L (3 dots)"];
+  const rotated = s => s.map(c => [1 - c[1], c[0]]);
+
+  function shapeRows(shape, ox, oy) {
+    const g = Array.from({ length: H }, () => Array(W).fill("0"));
+    shape.forEach(c => { g[oy + c[1]][ox + c[0]] = "2"; });
+    return g.map(r => r.join(""));
+  }
+  function miniFig(shape, caption) {
+    const f = document.createElement("figure");
+    const d = document.createElement("div"); d.className = "led sm";
+    fill(d, shapeRows(shape, 1, 1).slice(0, 4).map(r => r.slice(0, 4)));
+    const c = document.createElement("figcaption"); c.textContent = caption;
+    f.append(d, c); return f;
+  }
+
+  const shapeFigs = document.getElementById("shapeFigs");
+  SHAPES.forEach((s, i) => shapeFigs.appendChild(miniFig(s, NAMES[i])));
+
+  const rotFigs = document.getElementById("rotFigs");
+  let s = SHAPES[2];
+  for (let t = 0; t < 4; t++) {
+    rotFigs.appendChild(miniFig(s, t === 0 ? "Start" : t + " turn" + (t > 1 ? "s" : "")));
+    if (t < 3) { const a = document.createElement("span"); a.className = "arrow"; a.textContent = "→"; rotFigs.appendChild(a); }
+    s = rotated(s);
+  }
+
+  const chart = document.getElementById("speedChart");
+  for (let sc = 0; sc <= 12; sc += 2) {
+    const ms = Math.max(250, 800 - sc * 50);
+    const row = document.createElement("div");
+    row.innerHTML = `<span>score ${sc}</span><span class="bar" style="width:${(ms / 800 * 100).toFixed(0)}%"></span><span class="ms">${ms} ms</span>`;
+    chart.appendChild(row);
+  }
+
+  // ----- simulator -----
+  const led = document.getElementById("simLed");
+  const logEl = document.getElementById("log");
+  let board, piece, px, py, score, speed, gameOver, busy = false, paused = false, timer = null;
+
+  const fits = (sh, x, y) => sh.every(c => {
+    const cx = x + c[0], cy = y + c[1];
+    if (cx < 0 || cx >= W || cy >= H) return false;
+    return !(cy >= 0 && board[cy][cx]);
+  });
+  const randint = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+  const log = t => { logEl.textContent = t; };
+
+  let hint = null; // {shape, x, y} best landing spot, drawn as dashed outline
+
+  // Score a finished board the way the checklist on this page describes
+  function evaluate(b, lines) {
+    let holes = 0, maxH = 0, bump = 0; const hts = [];
+    for (let x = 0; x < W; x++) {
+      let top = H;
+      for (let y = 0; y < H; y++) if (b[y][x]) { top = y; break; }
+      const h = H - top; hts.push(h); maxH = Math.max(maxH, h);
+      for (let y = top + 1; y < H; y++) if (!b[y][x]) holes++;
+    }
+    for (let x = 1; x < W; x++) bump += Math.abs(hts[x] - hts[x - 1]);
+    return { score: lines * 10 - holes * 6 - maxH * 2 - bump, lines, holes, maxH, bump };
+  }
+  function bestMove() {
+    let best = null; let r = piece;
+    for (let t = 0; t < 4; t++) {
+      for (let x = -1; x < W; x++) {
+        if (!fits(r, x, py)) continue;
+        let y = py; while (fits(r, x, y + 1)) y++;
+        const b = board.map(row => row.slice());
+        r.forEach(c => { if (y + c[1] >= 0) b[y + c[1]][x + c[0]] = 1; });
+        let lines = 0;
+        for (let yy = H - 1; yy >= 0; yy--) if (b[yy].every(v => v)) { b.splice(yy, 1); b.unshift(Array(W).fill(0)); lines++; yy++; }
+        const e = evaluate(b, lines);
+        if (!best || e.score > best.e.score) best = { shape: r, x, y, t, e };
+      }
+      r = rotated(r);
+    }
+    return best;
+  }
+  function showHint() {
+    if (gameOver || busy) return;
+    const b = bestMove();
+    if (!b) { log("No place fits."); return; }
+    hint = b;
+    const e = b.e;
+    log(`Best: column ${b.x}, ${b.t} turn(s) · lines ${e.lines}, holes ${e.holes}, height ${e.maxH}, bumpiness ${e.bump} → score ${e.score}`);
+    draw();
+  }
+
+  function draw(flashRows) {
+    const g = board.map(r => r.map(v => v ? "1" : "0"));
+    if (hint && !gameOver) hint.shape.forEach(c => { const y = hint.y + c[1]; if (y >= 0 && g[y][hint.x + c[0]] === "0") g[y][hint.x + c[0]] = "g"; });
+    if (!gameOver) piece.forEach(c => { const y = py + c[1]; if (y >= 0) g[y][px + c[0]] = "2"; });
+    if (flashRows) flashRows.rows.forEach(y => { g[y] = Array(W).fill(flashRows.on ? "2" : "0"); });
+    fill(led, g.map(r => r.join("")));
+    document.getElementById("vPx").textContent = px;
+    document.getElementById("vPy").textContent = py;
+    document.getElementById("vScore").textContent = score;
+    document.getElementById("vSpeed").textContent = speed;
+  }
+  function spawn() {
+    hint = null;
+    const k = randint(0, SHAPES.length - 1);
+    piece = SHAPES[k];
+    const turns = randint(0, 3);
+    for (let i = 0; i < turns; i++) piece = rotated(piece);
+    px = randint(0, W - 2); py = 0;
+    if (!fits(piece, px, py)) { gameOver = true; log(`Game over · score ${score}. Press A+B to restart.`); }
+    else log(`spawn(): ${NAMES[k]}, ${turns} turn(s), column ${px}`);
+  }
+  function reset() {
+    board = Array.from({ length: H }, () => Array(W).fill(0));
+    score = 0; speed = 800; gameOver = false; busy = false;
+    spawn(); draw(); schedule();
+  }
+  function schedule() { clearTimeout(timer); if (!paused && !gameOver) timer = setTimeout(tick, speed); }
+  function tick() {
+    if (busy || gameOver) return;
+    if (fits(piece, px, py + 1)) { py++; draw(); schedule(); return; }
+    piece.forEach(c => { if (py + c[1] >= 0) board[py + c[1]][px + c[0]] = 1; });
+    const full = []; for (let y = 0; y < H; y++) if (board[y].every(v => v)) full.push(y);
+    if (!full.length) { log("lockPiece(): landed"); spawn(); draw(); schedule(); return; }
+    busy = true; let n = 0;
+    const flash = () => {
+      draw({ rows: full, on: n % 2 === 1 });
+      if (++n < 6) { setTimeout(flash, 100); return; }
+      full.forEach(y => { board.splice(y, 1); board.unshift(Array(W).fill(0)); });
+      score += full.length; speed = Math.max(250, 800 - score * 50); busy = false;
+      spawn(); log(`clearRows(): ${full.length} row(s) cleared · speed now ${speed} ms`);
+      draw(); schedule();
+    };
+    flash();
+  }
+  function move(dx) {
+    if (gameOver || busy) return;
+    if (fits(piece, px + dx, py)) { px += dx; log(`fits(piece, ${px}, ${py}) → true, moved`); }
+    else log(`fits(piece, ${px + dx}, ${py}) → false, blocked`);
+    draw();
+  }
+  function tryRotate(turns) {
+    if (gameOver || busy) return;
+    let r = piece; for (let i = 0; i < turns; i++) r = rotated(r);
+    for (const dx of [0, -1, 1]) {
+      if (fits(r, px + dx, py)) {
+        piece = r; px += dx;
+        log(`tryRotate(${turns}) → fits${dx ? ", kicked " + (dx < 0 ? "left" : "right") : ""}`);
+        draw(); return;
+      }
+    }
+    log(`tryRotate(${turns}) → no room, not turned`);
+  }
+  function shake() {
+    if (gameOver || busy) return;
+    while (fits(piece, px, py + 1)) py++;
+    log("Shake: dropped to the bottom"); draw();
+  }
+  function ab() { if (gameOver) { reset(); return; } tryRotate(1); }
+
+  document.getElementById("bA").onclick = () => move(-1);
+  document.getElementById("bB").onclick = () => move(1);
+  document.getElementById("bAB").onclick = ab;
+  document.getElementById("bTL").onclick = () => tryRotate(3);
+  document.getElementById("bTR").onclick = () => tryRotate(1);
+  document.getElementById("bShake").onclick = shake;
+  document.getElementById("bHint").onclick = showHint;
+  const pauseBtn = document.getElementById("bPause");
+  pauseBtn.onclick = () => { paused = !paused; pauseBtn.textContent = paused ? "Resume" : "Pause"; if (!paused) schedule(); else clearTimeout(timer); };
+
+  document.addEventListener("keydown", e => {
+    if (e.target.closest && e.target.closest("button") && (e.key === " " || e.key === "Enter")) return;
+    const map = { ArrowLeft: () => move(-1), ArrowRight: () => move(1), ArrowUp: ab, " ": shake, h: showHint, H: showHint };
+    if (map[e.key]) { e.preventDefault(); map[e.key](); }
+  });
+
+  reset();
+})();
+</script>
