@@ -2,7 +2,9 @@
 
 A small Tetris game for the 5×5 LED screen of the BBC micro:bit (works on V1 and V2), written in MakeCode JavaScript.
 
-**[How the program works →](how-tetris-works.html)**: a walk-through of the code, what it teaches about thinking through a problem, and a playable simulator with a "Show best move" hint.
+🌐 **Website:** [aisimon.github.io/bbc-microbit](https://aisimon.github.io/bbc-microbit/)
+
+**[How the program works →](https://aisimon.github.io/bbc-microbit/how-tetris-works.html)**: a walk-through of the code, what it teaches about thinking through a problem, and a playable simulator with a "Show best move" hint.
 
 ## Play it on a micro:bit
 
@@ -34,4 +36,4 @@ A small Tetris game for the 5×5 LED screen of the BBC micro:bit (works on V1 an
 | File | What it is |
 |---|---|
 | [`tetris.ts`](tetris.ts) | The game, ready to paste into MakeCode |
-| [`how-tetris-works.html`](how-tetris-works.html) | Explainer page with diagrams and a simulator |
+| [`how-tetris-works.html`](how-tetris-works.html) | Explainer page with diagrams and a simulator ([open it live](https://aisimon.github.io/bbc-microbit/how-tetris-works.html)) |
